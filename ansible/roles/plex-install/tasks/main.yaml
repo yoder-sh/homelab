@@ -1,0 +1,57 @@
+---
+- name: Install required packages
+  dnf:
+    name: 
+      - udev
+      - wget
+      - jq
+    state: present
+    update_cache: yes
+  
+- name: Get latest Plex version information
+  shell: curl -s 'https://plex.tv/api/downloads/5.json' | jq -r '.computer.Linux.version'
+  register: plex_version
+  changed_when: false
+  
+- name: Set Plex version
+  set_fact:
+    plex_release: "{{ plex_version.stdout }}"
+  
+- name: Download Plex Media Server RPM
+  get_url:
+    url: "https://downloads.plex.tv/plex-media-server-new/{{ plex_release }}/redhat/plexmediaserver-{{ plex_release }}.x86_64.rpm"
+    dest: /tmp/plexmediaserver.rpm
+    mode: '0644'
+    
+- name: Install Plex Media Server package
+  dnf:
+    name: /tmp/plexmediaserver.rpm
+    state: present
+    disable_gpg_check: yes
+    
+- name: Create version information directory
+  file:
+    path: /plex
+    state: directory
+    mode: '0755'
+    
+- name: Create version information file
+  copy:
+    dest: /plex/build_version
+    content: |
+      Version: custom
+      Build-date: {{ ansible_date_time.iso8601 }}
+      
+- name: Clean up temporary files
+  file:
+    path: /tmp/plexmediaserver.rpm
+    state: absent
+    
+- name: Display completion message
+  debug:
+    msg: "Plex Media Server installation complete! You can access it at http://localhost:32400/web"
+
+
+
+
+

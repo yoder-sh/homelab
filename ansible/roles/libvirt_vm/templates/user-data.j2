@@ -1,0 +1,70 @@
+#cloud-config
+hostname: {{ vm_name }}
+{% if vm_domain is defined and vm_domain | length > 0 %}
+fqdn: {{ vm_name }}.{{ vm_domain }}
+{% endif %}
+manage_etc_hosts: true
+
+# Configure networking with both static and DHCP options
+
+users:
+  - name: ansible
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    groups: users, admin
+    home: /home/ansible
+    shell: /bin/bash
+    lock_passwd: false
+{% if vm_ssh_pub_key | bool %}
+    ssh_authorized_keys:
+      - {{ lookup('file', vm_ssh_pub_key_path) }}
+{% endif %}
+
+# Set passwords directly
+chpasswd:
+  expire: false
+  list: |
+    ansible:{{ vm_passwords[vm_name] }}
+
+package_update: true
+package_upgrade: true
+
+# Configure SSH settings
+{% if vm_ssh_pub_key | bool and vm_disable_ssh_password | default(false) | bool %}
+ssh_pwauth: false
+ssh:
+  password_authentication: false
+{% else %}
+ssh_pwauth: true
+ssh:
+  password_authentication: true
+{% endif %}
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/allow_passwords.conf
+    content: |
+{% if vm_ssh_pub_key | bool and vm_disable_ssh_password | default(false) | bool %}
+      # Disable password authentication when using SSH keys
+      PasswordAuthentication no
+      ChallengeResponseAuthentication no
+{% else %}
+      # Allow password authentication
+      PasswordAuthentication yes
+      ChallengeResponseAuthentication no
+{% endif %}
+
+packages:
+  - qemu-guest-agent
+{% for package in vm_packages_list %}
+  - {{ package }}
+{% endfor %}
+
+# Run additional commands to ensure networking works
+runcmd:
+- systemctl enable qemu-guest-agent
+- systemctl start qemu-guest-agent
+- systemctl restart systemd-networkd
+- ip addr show
+- ip route show
+- dhclient -v enp1s0
+
+

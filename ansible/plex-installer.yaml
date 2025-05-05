@@ -1,0 +1,35 @@
+- hosts: plex-server
+  gather_facts: true
+  become: true
+  
+  pre_tasks:    
+    - name: Check if Plex is already installed
+      command: rpm -q plexmediaserver
+      register: plex_check
+      changed_when: false
+      failed_when: false
+      
+    - name: Notify if Plex is already installed
+      debug:
+        msg: "Plex is already installed ({{ plex_check.stdout }}). Skipping installation."
+      when: plex_check.rc == 0
+
+    - name: Create storage mount point
+      file:
+        path: /storage
+        state: directory
+        mode: '0755'
+        owner: root
+
+    - name: Mount virtiofs storage
+      mount:
+        path: /storage
+        src: storage-btrfs
+        fstype: virtiofs
+        state: mounted
+        opts: defaults
+      become: yes
+
+  roles:
+    - role: plex-install
+      when: plex_check.rc != 0

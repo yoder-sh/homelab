@@ -1,0 +1,8 @@
+# Make sure you add the virtiofs drive after build
+hostname: "docker"
+description: "docker host"
+os: "fedora"
+size: "large"
+ip_address: "192.168.120.12"
+tags: "qemu,fedora,docker"
+userdata: "user-data-docker.yaml"

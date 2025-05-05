@@ -1,0 +1,66 @@
+---
+- name: Create docker group
+  group:
+    name: docker
+    state: present
+
+- name: Add users to docker group
+  user:
+    name: "{{ item }}"
+    groups: docker
+    append: yes
+  loop:
+    - ansible
+    - zack
+
+
+- name: Create Docker daemon config directory
+  file:
+    path: /etc/docker
+    state: directory
+    mode: '0755'
+
+- name: Create container-configs directory
+  file:
+    path: /container-configs
+    state: directory
+    mode: '0755'
+    owner: root
+    group: docker
+
+- name: Create storage mount point
+  file:
+    path: /storage
+    state: directory
+    mode: '0755'
+    owner: root
+    group: docker
+
+- name: Mount virtiofs storage
+  mount:
+    path: /storage
+    src: storage-btrfs
+    fstype: virtiofs
+    state: mounted
+    opts: defaults
+  become: yes
+
+- name: Configure Docker daemon
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "icc": false,
+        "userns-remap": "default",
+        "live-restore": true,
+        "userland-proxy": false,
+        "no-new-privileges": true,
+        "storage-driver": "overlay2",
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
+      }
+    mode: '0644'
+  notify: restart docker

@@ -1,0 +1,114 @@
+---
+# Main tasks file for libvirt_vm role
+
+# Set distribution-specific package names
+- name: Set Debian/Ubuntu specific packages
+  set_fact:
+    libvirt_packages:
+      - python3-lxml
+      - genisoimage
+      - qemu-kvm
+      - libvirt-daemon-system
+      - virtinst
+      - bridge-utils
+  when: ansible_os_family == "Debian"
+
+- name: Set RedHat/CentOS/Fedora specific packages
+  set_fact:
+    libvirt_packages:
+      - python3-lxml
+      - genisoimage
+      - qemu-kvm
+      - libvirt
+      - libvirt-daemon
+      - virt-install
+      - bridge-utils
+  when: ansible_os_family == "RedHat"
+
+# Ensure required packages are installed
+- name: Ensure required packages are installed
+  package:
+    name: "{{ libvirt_packages }}"
+    state: present
+  become: true
+  when: install_dependencies | bool
+
+# Check if VMs variable is empty or undefined
+- name: Verify VM list is not empty
+  fail:
+    msg: >
+      No VMs defined. Please specify at least one VM in the 'vms' variable.
+      Example:
+        vms:
+          - name: "my-vm1"
+          - name: "my-vm2"
+            memory_mb: 4096
+  when: vms is not defined or vms | length == 0
+
+# Get storage pool information
+- name: Get storage pool information
+  virt_pool:
+    name: "{{ vm_storage_pool }}"
+    command: info
+  register: pool_info
+
+- name: Fail if storage pool doesn't exist
+  fail:
+    msg: "Storage pool '{{ vm_storage_pool }}' does not exist. Please create it first or specify a different pool."
+  when: pool_info.failed is defined and pool_info.failed
+
+- name: Get storage pool path
+  shell: virsh pool-dumpxml {{ vm_storage_pool }} | grep -A1 "<target>" | grep "<path>" | sed -e 's/^.*<path>\(.*\)<\/path>.*$/\1/'
+  register: pool_path
+  changed_when: false
+
+- name: Set storage pool directory
+  set_fact:
+    libvirt_pool_dir: "{{ pool_path.stdout }}"
+
+- name: Create VM image directory if it doesn't exist
+  file:
+    path: "{{ libvirt_pool_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Download base cloud image
+  get_url:
+    url: "{{ vm_image_url }}"
+    dest: "{{ libvirt_pool_dir }}/base-image.qcow2"
+    checksum: "{{ vm_image_checksum }}"
+    mode: '0644'
+
+# Generate random passwords for VMs
+- name: Generate random passwords for VMs
+  set_fact:
+    vm_passwords: "{{ vm_passwords | default({}) | combine({item.name: lookup('password', '/dev/null chars=ascii_letters,digits length=12')}) }}"
+  with_items: "{{ vms }}"
+
+# Loop through each VM in the list
+- name: Process each VM
+  include_tasks: "{{ role_path }}/tasks/vm_provision.yaml"
+  loop: "{{ vms }}"
+  loop_control:
+    loop_var: vm_item
+
+- name: Get all VMs IP addresses
+  shell: >
+    virsh domifaddr {{ item.name }} --source agent | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' || echo "No IP found"
+  register: all_vm_ips
+  changed_when: false
+  ignore_errors: true
+  loop: "{{ vms }}"
+  when: display_summary | bool
+
+- name: Display summary of all VMs
+  debug:
+    msg:
+      - "-------------------------------------"
+      - "VM Name: {{ item.item.name }}"
+      - "IP Address: {{ vm_ip.stdout if vm_ip.stdout != 'No IP found' else 'Still booting or unreachable' }}"
+      - "SSH Access: ssh ansible@{{ vm_ip.stdout if vm_ip.stdout != 'No IP found' else 'unavailable' }}"
+      - "Root Password: {{ vm_passwords[item.item.name] }}"
+      - "-------------------------------------"
+  loop: "{{ all_vm_ips.results }}"
+  when: display_summary | bool and all_vm_ips is defined and vm_status is failed
