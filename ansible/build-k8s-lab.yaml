@@ -1,0 +1,57 @@
+---
+# create_vms.yml
+# Example playbook that uses the libvirt_vm role
+
+- name: Create and configure VMs using libvirt
+  hosts: mini-server
+  become: true
+  
+  vars:
+    
+    # Common settings for all VMs
+    vm_image_url: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+    vm_image_checksum: "sha512:afcd77455c6d10a6650e8affbcb4d8eb4e81bd17f10b1d1dd32d2763e07198e168a3ec8f811770d50775a83e84ee592a889a3206adf0960fb63f3d23d1df98af"
+    vm_use_ssh_key: false  # Disable SSH key authentication
+    debug_mode: false
+    
+    # List of VMs to create
+    vms:
+      - name: "k8s-jumphost"
+        memory_mb: 4096
+        vcpus: 2
+        disk_size_gb: 20
+        storage_pool: "vm-storage-pool"
+        network: "bridged-network"
+        ssh_pub_key: true
+        disable_ssh_password: true
+
+      - name: "k8s-server"
+        memory_mb: 4096
+        vcpus: 2
+        disk_size_gb: 20
+        ssh_pub_key: true
+        disable_ssh_password: true
+        storage_pool: "vm-storage-pool"
+        network: "bridged-network"
+      
+      - name: "k8s-worker01"
+        memory_mb: 4096
+        vcpus: 2
+        disk_size_gb: 20
+        storage_pool: "vm-storage-pool"
+        network: "bridged-network"
+        ssh_pub_key: true
+        disable_ssh_password: true
+
+      - name: "k8s-worker02"
+        memory_mb: 4096
+        vcpus: 2
+        disk_size_gb: 20
+        storage_pool: "vm-storage-pool"
+        network: "bridged-network"
+        ssh_pub_key: true
+        disable_ssh_password: true
+  
+  
+  roles:
+    - role: libvirt_vm

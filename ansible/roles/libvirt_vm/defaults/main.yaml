@@ -1,0 +1,53 @@
+---
+# Default variables for the libvirt_vm role
+
+# Whether to install dependencies
+install_dependencies: true  # Set to false to skip installing dependencies
+
+# Debug mode
+debug_mode: true  # Set to true to enable detailed debugging output
+
+# SSH key configuration
+vm_ssh_pub_key: false  # Set to true to upload SSH public key to VMs
+vm_ssh_pub_key_path: "~/.ssh/id_rsa.pub"  # Path to the public key to upload
+
+# Libvirt storage configuration
+vm_storage_pool: "default"  # Name of the libvirt storage pool to use
+vm_storage_pool_dir: ""     # Will be determined dynamically from the pool
+
+# Common VM settings - these are the default values for all VMs
+vm_memory_mb: 2048
+vm_vcpus: 2
+vm_disk_size_gb: 20
+vm_os_variant: "debian12"
+vm_image_url: "https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.qcow2"
+vm_image_checksum: "sha512:23f596bdeceb33caebd28d72ffbc2b1ae5eff76209b96a08e2714f2665535fde2414e3eb1b40cedb729b6fe1bb0c88a4b4d0b195ea04afdbcafe1216fdaeb3cd"
+vm_generate_passwords: true  # Set to false to use the default password instead of random ones
+
+# Default domain for VMs
+vm_domain: ""  # Domain suffix for VM FQDNs
+
+vm_network_set: "bridged-network"
+
+# Default packages to install on VMs
+vm_packages:
+  - vim
+  - python3
+  - sudo
+
+# VM creation mode
+wait_for_ip: true
+display_summary: true
+
+# Default list of VMs to create (empty by default)
+# Override this variable in your playbook with your own list of VMs
+vms: []
+
+# Example VM list format:
+# vms:
+#   - name: "vm1"     # Only name is required, other properties are optional
+#   - name: "vm2"
+#     memory_mb: 4096 # Override default memory
+#     vcpus: 4        # Override default vcpus
+#   - name: "vm3"
+#     disk_size_gb: 50 # Override default disk size

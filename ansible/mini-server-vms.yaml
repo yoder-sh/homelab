@@ -1,0 +1,26 @@
+---
+# create_vms.yml
+# Example playbook that uses the libvirt_vm role
+
+- name: Create and configure VMs using libvirt
+  hosts: localhost
+  become: true
+  
+  vars:
+    # Common settings for all VMs
+    vm_root_password: "YourSecurePassword123"
+    vm_bridge_interface: "br0"
+    vm_memory_mb: 4096 # Set 4GB as default memory
+    
+    # List of VMs to create
+    vms:
+      - name: "web-server"
+        # Using default settings (4GB RAM from above)
+      - name: "db-server"
+        memory_mb: 8192 # Override with 8GB for database
+        disk_size_gb: 50
+      - name: "app-server"
+        vcpus: 4
+  
+  roles:
+    - libvirt_vm

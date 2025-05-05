@@ -1,0 +1,8 @@
+# Make sure you add the virtiofs drive after build
+hostname: "plex"
+description: "plex host"
+os: "fedora"
+size: "cpu-heavy"
+ip_address: "192.168.120.13"
+tags: "qemu,fedora,plex"
+userdata: "user-data-plex.yaml"

@@ -1,0 +1,297 @@
+---
+# Tasks for provisioning a single VM
+
+# Check early if VM already exists
+- name: Check if VM {{ vm_item.name }} already exists
+  virt:
+    name: "{{ vm_item.name }}"
+    command: status
+  register: vm_status
+  ignore_errors: true
+
+- name: Debug VM existence check results
+  debug:
+    msg:
+      - "VM Name: {{ vm_item.name }}"
+      - "VM Status: {{ vm_status }}"
+      - "VM exists: {{ vm_status is not failed }}"
+      - "Status result: {{ vm_status.status | default('N/A') }}"
+      - "Failed: {{ vm_status.failed | default(false) }}"
+      - "Error message: {{ vm_status.msg | default('No error') }}"
+    verbosity: "{{ 0 if debug_mode | bool else 1 }}"
+  when: debug_mode | bool
+
+- name: Skip provisioning for existing VM {{ vm_item.name }}
+  debug:
+    msg: "VM {{ vm_item.name }} already exists. Skipping creation."
+  when: vm_status is not failed
+
+# Only run the remaining tasks if VM doesn't exist
+- block:
+  # Set VM specific variables, fallback to default values if not specified
+  - name: Set VM specific variables
+    set_fact:
+      vm_name: "{{ vm_item.name }}"
+      vm_memory: "{{ vm_item.memory_mb | default(vm_memory_mb) }}"
+      vm_cpu: "{{ vm_item.vcpus | default(vm_vcpus) }}"
+      vm_disk: "{{ vm_item.disk_size_gb | default(vm_disk_size_gb) }}"
+      vm_packages_list: "{{ vm_item.packages | default(vm_packages) }}"
+      vm_current_storage_pool: "{{ vm_item.storage_pool | default(vm_storage_pool) }}"
+      vm_network: "{{ vm_item.network | default(vm_network_set) }}"
+      # SSH settings per VM
+      vm_ssh_pub_key: "{{ vm_item.ssh_pub_key | default(vm_ssh_pub_key) }}"
+      vm_ssh_pub_key_path: "{{ vm_item.ssh_pub_key_path | default(vm_ssh_pub_key_path) }}"
+      vm_disable_ssh_password: "{{ vm_item.disable_ssh_password | default(vm_disable_ssh_password) }}"
+
+  - name: Debug VM specific variables
+    debug:
+      msg:
+        - "VM Name: {{ vm_name }}"
+        - "VM Memory: {{ vm_memory }} MB"
+        - "VM CPU: {{ vm_cpu }} vCPUs"
+        - "VM Disk: {{ vm_disk }} GB"
+        - "VM Storage Pool: {{ vm_current_storage_pool }}"
+        - "VM Packages: {{ vm_packages_list | join(', ') }}"
+        - "VM Network: {{ vm_network }}"
+    when: debug_mode | bool
+
+  # Get storage pool information for this VM
+  - name: Get storage pool information for {{ vm_name }}
+    virt_pool:
+      name: "{{ vm_current_storage_pool }}"
+      command: info
+    register: vm_pool_info
+
+  - name: Fail if storage pool doesn't exist
+    fail:
+      msg: "Storage pool '{{ vm_current_storage_pool }}' does not exist. Please create it first or specify a different pool for VM '{{ vm_name }}'."
+    when: vm_pool_info.failed is defined and vm_pool_info.failed
+
+  - name: Get storage pool XML for {{ vm_name }}
+    command: virsh pool-dumpxml {{ vm_current_storage_pool }}
+    register: vm_pool_xml
+    changed_when: false
+
+  - name: Get storage pool path using shell command
+    shell: virsh pool-dumpxml {{ vm_current_storage_pool }} | xmllint --xpath "string(/pool/target/path)" -
+    register: vm_pool_path_shell
+    changed_when: false
+
+  - name: Set storage pool directory from shell command
+    set_fact:
+      vm_pool_dir: "{{ vm_pool_path_shell.stdout | trim }}"
+
+  - name: Debug storage pool information from shell
+    debug:
+      msg:
+        - "Storage Pool: {{ vm_current_storage_pool }}"
+        - "Storage Pool Path: {{ vm_pool_dir }}"
+      verbosity: 0  # Always show this debug output
+    when: debug_mode | bool
+
+  - name: Debug storage pool path before copying
+    debug:
+      msg:
+        - "Storage Pool Path: {{ vm_pool_dir }}"
+        - "Full path to check: {{ vm_pool_dir }}/{{ vm_name }}.qcow2"
+      verbosity: 0
+    when: debug_mode | bool
+
+  - name: Check if storage pool directory exists
+    stat:
+      path: "{{ vm_pool_dir }}"
+    register: pool_dir_stat
+
+  - name: Debug directory existence
+    debug:
+      msg:
+        - "Directory exists: {{ pool_dir_stat.stat.exists }}"
+        - "Is directory: {{ pool_dir_stat.stat.isdir | default(false) }}"
+        - "Permissions: {{ pool_dir_stat.stat.mode | default('unknown') }}"
+        - "Owner: {{ pool_dir_stat.stat.pw_name | default('unknown') }}"
+        - "Group: {{ pool_dir_stat.stat.gr_name | default('unknown') }}"
+      verbosity: 0
+    when: debug_mode | bool
+
+  - name: Ensure storage pool directory exists
+    file:
+      path: "{{ vm_pool_dir }}"
+      state: directory
+      mode: '0755'
+    become: true
+    when: not pool_dir_stat.stat.exists or not pool_dir_stat.stat.isdir
+
+  - name: Copy base image for VM
+    copy:
+      src: "{{ libvirt_pool_dir }}/base-image.qcow2"
+      dest: "{{ vm_pool_dir }}/{{ vm_name }}.qcow2"
+      remote_src: yes
+      mode: '0644'
+    become: true
+
+  - name: Debug vm_pool_dir variable
+    debug:
+      var: vm_pool_dir
+      verbosity: 0
+    when: debug_mode | bool
+
+  - name: Resize the disk image
+    command: >
+      qemu-img resize {{ vm_pool_dir }}/{{ vm_name }}.qcow2 {{ vm_disk }}G
+    args:
+      creates: "{{ vm_pool_dir }}/{{ vm_name }}-resized"
+    register: resize_disk
+    
+  - name: Mark disk as resized if the command was successful
+    file:
+      path: "{{ vm_pool_dir }}/{{ vm_name }}-resized"
+      state: touch
+    when: resize_disk.changed
+
+  - name: Create cloud-init user-data file for {{ vm_name }}
+    template:
+      src: user-data.j2
+      dest: "{{ vm_pool_dir }}/{{ vm_name }}-user-data"
+
+  - name: Create cloud-init meta-data file for {{ vm_name }}
+    template:
+      src: meta-data.j2
+      dest: "{{ vm_pool_dir }}/{{ vm_name }}-meta-data"
+
+  - name: Debug meta-data content
+    command: cat {{ vm_pool_dir }}/{{ vm_name }}-meta-data
+    register: meta_data_content
+    changed_when: false
+    when: debug_mode | bool
+
+  - name: Show meta-data content
+    debug:
+      msg: "{{ meta_data_content.stdout_lines }}"
+    when: debug_mode | bool and meta_data_content is defined
+
+  - name: Debug user-data content
+    command: cat {{ vm_pool_dir }}/{{ vm_name }}-user-data
+    register: user_data_content
+    changed_when: false
+    when: debug_mode | bool
+
+  - name: Show user-data content
+    debug:
+      msg: "{{ user_data_content.stdout_lines }}"
+    when: debug_mode | bool and user_data_content is defined
+
+  - name: Debug virt-install command
+    debug:
+      msg: >
+        virt-install
+        --name {{ vm_name }}
+        --memory {{ vm_memory }}
+        --vcpus {{ vm_cpu }}
+        --disk path={{ vm_pool_dir }}/{{ vm_name }}.qcow2,format=qcow2
+        --os-variant {{ vm_os_variant }}
+        --virt-type kvm
+        --graphics none
+        --channel unix,target_type=virtio,name=org.qemu.guest_agent.0
+        --import
+        --cloud-init user-data={{ vm_pool_dir }}/{{ vm_name }}-user-data,meta-data={{ vm_pool_dir }}/{{ vm_name }}-meta-data
+        --noautoconsole
+        --network network={{ vm_network }}
+        --autostart
+
+    when: debug_mode | bool
+
+  - name: Define and start the VM {{ vm_name }} with bridged networking
+    command: >
+      virt-install
+      --name {{ vm_name }}
+      --memory {{ vm_memory }}
+      --vcpus {{ vm_cpu }}
+      --disk path={{ vm_pool_dir }}/{{ vm_name }}.qcow2,format=qcow2
+      --os-variant {{ vm_os_variant }}
+      --virt-type kvm
+      --graphics none
+      --channel unix,target_type=virtio,name=org.qemu.guest_agent.0
+      --import
+      --cloud-init user-data={{ vm_pool_dir }}/{{ vm_name }}-user-data,meta-data={{ vm_pool_dir }}/{{ vm_name }}-meta-data
+      --noautoconsole
+      --network network={{ vm_network }}
+      --autostart
+
+    when: vm_status is failed
+    register: virt_install_result
+    failed_when: false
+    
+  - name: Fail with helpful error if VM creation failed
+    fail:
+      msg: >
+        Failed to create VM '{{ vm_name }}' using virt-install.
+        Please check the following:
+        1. libvirtd service is running: 'systemctl status libvirtd'
+        2. Network '{{ vm_network }}' exists and is properly configured
+        3. You have permission to create VMs
+        4. Required packages (qemu-kvm, libvirt-daemon-system, virtinst) are installed
+        
+        Error: {{ virt_install_result.stderr | default('Unknown error') }}
+    when: virt_install_result.rc is defined and virt_install_result.rc != 0
+
+  - name: Wait for VM to get IP address
+    shell: >
+      virsh domifaddr {{ vm_name }} --source agent | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | grep -v '^127\.'
+    register: vm_ip
+    until: vm_ip.stdout | length > 0
+    retries: 15
+    delay: 10
+    changed_when: false
+    ignore_errors: true
+    when: wait_for_ip | bool
+
+  - name: Debug VM IP stdout value
+    debug:
+      msg: 
+        - "vm_ip.stdout raw value: '{{ vm_ip.stdout }}'"
+        - "vm_ip.stdout type: {{ vm_ip.stdout | type_debug }}"
+        - "vm_ip.stdout length: {{ vm_ip.stdout | length }}"
+        - "vm_ip stdout lines: {{ vm_ip.stdout_lines | default([]) | length }} lines"
+        - "vm_ip full variable: {{ vm_ip | to_json }}"
+    when: wait_for_ip | bool
+
+  - name: Debug SSH availability
+    debug:
+      msg:
+        - "SSH available: {{ not vm_ready.failed | default(false) }}"
+        - "Wait time: {{ vm_ready.elapsed if vm_ready is defined else 'Unknown' }} seconds"
+        - "Error message: {{ vm_ready.msg if vm_ready.failed is defined and vm_ready.failed else 'No error' }}"
+    when: 
+      - wait_for_ip | bool
+      - vm_ip.stdout is defined
+      - vm_ip.stdout | length > 0
+    when: debug_mode | bool
+
+  - name: Wait for VM SSH to become available
+    wait_for:
+      host: "{{ vm_ip.stdout }}"
+      port: 22
+      delay: 10
+      timeout: 300
+    register: vm_ready
+    when: 
+      - wait_for_ip | bool
+      - vm_ip.stdout is defined
+      - vm_ip.stdout | length > 0
+    ignore_errors: true
+
+  - name: Output the IP address of the VM
+    debug:
+      msg: "VM {{ vm_name }} successfully created with IP address: {{ vm_ip }}"
+    when: vm_status is failed
+
+  - name: Clean up temporary files
+    file:
+      path: "{{ item }}"
+      state: absent
+    loop:
+      - "{{ vm_pool_dir }}/{{ vm_name }}-user-data"
+      - "{{ vm_pool_dir }}/{{ vm_name }}-meta-data"
+      - "{{ vm_pool_dir }}/{{ vm_name }}-resized"
+    
+  when: vm_status is failed

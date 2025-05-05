@@ -1,0 +1,29 @@
+#ansible-galaxy role install geerlingguy.docker
+
+- hosts: docker-server
+  gather_facts: true
+  become: true
+  
+  pre_tasks:    
+    - name: Check if Docker is already installed
+      command: which docker
+      register: docker_check
+      changed_when: false
+      failed_when: false
+      
+    - name: Check Docker version if command exists
+      command: docker --version
+      register: docker_version
+      changed_when: false
+      failed_when: false
+      when: docker_check.rc == 0
+      
+    - name: Display Docker status
+      debug:
+        msg: "Docker is already installed: {{ docker_version.stdout | default('Not installed') }}"
+      when: docker_check.rc == 0
+
+  roles:
+    - role: geerlingguy.docker
+      when: docker_check.rc != 0
+    - role: docker-config
