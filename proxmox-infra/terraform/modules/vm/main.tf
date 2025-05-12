@@ -32,7 +32,7 @@ locals {
       memory  = 16384
       disk    = "160G"
     }
-        "cpu-heavy" = {
+    "cpu-heavy" = {
       sockets = 4
       cores   = 4
       memory  = 6144

@@ -1,3 +1,5 @@
+#!/bin/bash
+
 export PROTON_USERNAME=$(aws ssm get-parameter --name "/homelab/protonvpn-username" --with-decryption --query "Parameter.Value" --output text)
 export PROTON_PASSWORD=$(aws ssm get-parameter --name "/homelab/protonvpn-password" --with-decryption --query "Parameter.Value" --output text)
 export CF_TOKEN=$(aws ssm get-parameter --name "/homelab/cf-token" --with-decryption --query "Parameter.Value" --output text)
@@ -10,4 +12,7 @@ export MUSE_SPOTIFY_CLIENT_ID=$(aws ssm get-parameter --name "/homelab/muse/SPOT
 export MUSE_SPOTIFY_CLIENT_SECRET=$(aws ssm get-parameter --name "/homelab/muse/SPOTIFY_CLIENT_SECRET" --with-decryption --query "Parameter.Value" --output text)
 export PLEX_CLAIM_TOKEN=$(aws ssm get-parameter --name "/homelab/plex/claim-token" --with-decryption --query "Parameter.Value" --output text)
 
+export CONCOURSE_CLIENT_SECRET=$(aws ssm get-parameter --name "/homelab/concourse/CLIENT_SECRET" --with-decryption --query "Parameter.Value" --output text)
+export CONCOURSE_TSA_CLIENT_SECRET=$(aws ssm get-parameter --name "/homelab/concourse/TSA_CLIENT_SECRET" --with-decryption --query "Parameter.Value" --output text)
 
+export MINECRAFT_RCON_PASSWORD=$(aws ssm get-parameter --name "/homelab/minecraft/RCON_PASSWORD" --with-decryption --query "Parameter.Value" --output text)

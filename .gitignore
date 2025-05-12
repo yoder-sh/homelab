@@ -38,3 +38,6 @@ terraform.rc
 
 # Ignore my notes notes
 notes
+
+# ENV
+.env
