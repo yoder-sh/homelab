@@ -1,0 +1,25 @@
+#cloud-config
+hostname: docker-dev
+fqdn: docker-dev.homelab.local
+
+packages:
+  - qemu-guest-agent
+
+users:
+  - name: zack
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - ${MBP_SSH_PUBLIC_KEY}
+  - name: ansible
+    groups: sudo
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    ssh_authorized_keys:
+      - ${ANSIBLE_SSH_PUBLIC_KEY}
+
+
+runcmd:
+  - systemctl enable qemu-guest-agent
+  - systemctl start qemu-guest-agent

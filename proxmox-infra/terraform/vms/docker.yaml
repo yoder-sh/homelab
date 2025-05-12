@@ -2,7 +2,7 @@
 hostname: "docker"
 description: "docker host"
 os: "fedora"
-size: "large"
+size: "xlarge"
 ip_address: "192.168.120.12"
 tags: "qemu,fedora,docker"
 userdata: "user-data-docker.yaml"

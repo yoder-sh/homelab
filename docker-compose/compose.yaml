@@ -2,20 +2,9 @@
 include:
   #- utils/utils-compose.yaml
   - mediarr/arr-compose.yaml
+  - gaming/minecraft-server.yaml
 name: services
 services:
-
-  portainer:
-    image: portainer/portainer-ce:latest
-    container_name: portainer
-    restart: always
-    ports:
-      - "8000:8000"
-      - "9443:9443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - portainer_data:/data
-
   nginx-proxy-manager:
     image: 'jc21/nginx-proxy-manager:latest'
     container_name: nginx-proxy-manager
@@ -39,6 +28,3 @@ services:
       - YOUTUBE_API_KEY=${MUSE_YOUTUBE_API_KEY}
       - SPOTIFY_CLIENT_ID=${MUSE_SPOTIFY_CLIENT_ID}
       - SPOTIFY_CLIENT_SECRET=${MUSE_SPOTIFY_CLIENT_SECRET}
-
-volumes:
-  portainer_data:
