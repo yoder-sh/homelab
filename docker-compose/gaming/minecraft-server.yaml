@@ -15,7 +15,7 @@ services:
       VERSION: 1.21.5
       TYPE: FABRIC
       SPAWN_PROTECTION: 0
-      VIEW_DISTANCE: 24
+      VIEW_DISTANCE: 32
       INIT_MEMORY: 6G
       MAX_MEMORY: 16G
       MOTD: "§l§6Welcome§r nerds..."
@@ -39,15 +39,17 @@ services:
     image: itzg/mc-backup
     container_name: minecraft-backups
     user: "1000:1000"
+    depends_on:
+      minecraft:
+        condition: service_healthy
     environment:
       BACKUP_INTERVAL: "6h"
       RCON_HOST: mc
       RCON_PASSWORD: ${MINECRAFT_RCON_PASSWORD}
       PRUNE_BACKUPS_DAYS: 14
       PRE_BACKUP_SCRIPT: |
-        echo "Before backup!"
-        echo "Also before backup from $$RCON_HOST to $$DEST_DIR"
-      POST_BACKUP_SCRIPT_FILE: /post-backup.sh
+        echo "Backup from $$RCON_HOST to $$DEST_DIR"
+      #POST_BACKUP_SCRIPT_FILE: /post-backup.sh
     volumes:
       # mount the same volume used by server, but read-only
       - minecraft_server_data:/data
@@ -55,8 +57,7 @@ services:
       # to external/cloud storage
       - /storage/data/minecraft-server/backups:/backups
       - ./post-backup.sh:/post-backup.sh:ro
-    depends_on:
-      - minecraft
+    
 
 volumes:
   minecraft_server_data:
