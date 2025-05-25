@@ -1,0 +1,1 @@
+# Empty userdata file. Modules requires one, so this will be empty for VMs that wont use cloud-init.

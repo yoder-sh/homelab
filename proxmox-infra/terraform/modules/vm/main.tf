@@ -48,6 +48,10 @@ locals {
       os = "fedora42"
       type = "l26"
     }
+    "talos"  = {
+      os = "talos"
+      type = "l26"
+    }
     "windows" = {
       os = "Win22"
       type = "win11"
@@ -67,7 +71,7 @@ resource "proxmox_vm_qemu" "vm-server" {
   sockets     = local.vm_size[var.size].sockets
   cores       = local.vm_size[var.size].cores
   memory      = local.vm_size[var.size].memory
-  boot        = "order=virtio0"
+  boot        = var.boot_order != null ? var.boot_order : "order=virtio0"
   onboot      = true
   os_type     = "cloud-init"
   qemu_os     = local.operating_system[var.os].type
@@ -92,6 +96,11 @@ resource "proxmox_vm_qemu" "vm-server" {
           storage = "local-lvm"
         }
       }
+      ide2 {
+        cdrom {
+          iso = var.iso != null ? var.iso : null
+        }
+      }
     }
   }
 
@@ -104,11 +113,11 @@ resource "proxmox_vm_qemu" "vm-server" {
 
   # cloud-init config
   cicustom   = "user=local:snippets/${var.userdata}"
-  ipconfig0  = format("ip=%s/24,gw=192.168.120.1", var.ip_address)
+  ipconfig0 = var.ip_address != null ? "ip=${var.ip_address}/24,gw=192.168.120.1" : "ip=dhcp"
   nameserver = "192.168.120.1"
 
   lifecycle {
-    ignore_changes = [desc,tags,network,disk,cicustom]
+    ignore_changes = [desc,tags,network,disks,cicustom]
   }
 
 }

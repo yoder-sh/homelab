@@ -1,0 +1,8 @@
+hostname: "talos-cp-01"
+description: "talos control plane"
+os: "talos"
+size: "medium"
+tags: "qemu,k8s,talos"
+userdata: "empty-userdata.yaml"
+iso: "local:iso/metal-amd64-talos.iso" # ISO and talos template will be created manually.
+boot_order: "order=ide2;virtio0"
