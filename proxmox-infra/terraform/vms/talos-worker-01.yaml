@@ -1,0 +1,8 @@
+hostname: "talos-worker-01"
+description: "talos worker"
+os: "talos"
+size: "large"
+tags: "qemu,k8s,talos,worker"
+userdata: "empty-userdata.yaml"
+iso: "local:iso/metal-amd64-talos.iso" # ISO and talos template will be created manually.
+boot_order: "order=ide2;virtio0"

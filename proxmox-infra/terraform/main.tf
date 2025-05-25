@@ -41,7 +41,9 @@ module "vm_resource" {
   description = each.value.description
   os          = each.value.os
   size        = each.value.size
-  ip_address  = each.value.ip_address
+  ip_address  = try(each.value.ip_address, null)
   tags        = each.value.tags
   userdata    = each.value.userdata
+  iso         = try(each.value.iso, null)
+  boot_order  = try(each.value.boot_order, "order=virtio0")
 }
