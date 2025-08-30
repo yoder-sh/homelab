@@ -80,21 +80,15 @@ services:
     network_mode: "service:gluetun"
     restart: unless-stopped
 
-  # qbittorrent:
-  #   image: lscr.io/linuxserver/qbittorrent:latest
-  #   container_name: qbittorrent
-  #   environment:
-  #     - PUID=1000
-  #     - PGID=1000
-  #     - TZ=Etc/UTC
-  #     - WEBUI_PORT=8080
-  #     - TORRENTING_PORT=6881
-  #   volumes:
-  #     - /storage-nvme/mediarr/configs/qbittorrent:/config
-  #     - /storage/media/downloads:/downloads
-  #   network_mode: "service:gluetun"
-  #   # ports:
-  #   #   - 8080:8080
-  #   #   - 6881:6881
-  #   #   - 6881:6881/udp
-  #   restart: unless-stopped
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - /container-configs/mediarr/configs/overseerr:/config
+    ports:
+      - 5055:5055
+    restart: unless-stopped
