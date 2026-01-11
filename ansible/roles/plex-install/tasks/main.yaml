@@ -55,3 +55,11 @@
 
 
 
+#Need to add this to enable plex repo:
+# [zack@plex ~]$ cat /etc/yum.repos.d/plex.repo
+# [PlexRepo]
+# name=PlexRepo
+# baseurl=https://downloads.plex.tv/repo/rpm/$basearch/
+# enabled=1 ###THIS IS THE IMPORTANT ONE
+# gpgkey=https://downloads.plex.tv/plex-keys/PlexSign.key
+# gpgcheck=1
